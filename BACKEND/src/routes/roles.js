@@ -18,7 +18,7 @@ router.post('/', async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error al crear rol', glosa: err.message || err.toString() });
+    res.status(500).json({ error: 'Error al crear rol', glosa: "Ocurrió un error interno" });
   }
 });
 
@@ -28,7 +28,7 @@ router.get('/', async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error al listar roles', glosa: err.message || err.toString() });
+    res.status(500).json({ error: 'Error al listar roles', glosa: "Ocurrió un error interno" });
   }
 });
 
@@ -39,7 +39,7 @@ router.get('/:id', async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error al obtener rol', glosa: err.message || err.toString() });
+    res.status(500).json({ error: 'Error al obtener rol', glosa: "Ocurrió un error interno" });
   }
 });
 
@@ -58,7 +58,7 @@ router.put('/:id', async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error al actualizar rol', glosa: err.message || err.toString() });
+    res.status(500).json({ error: 'Error al actualizar rol', glosa: "Ocurrió un error interno" });
   }
 });
 
@@ -76,7 +76,7 @@ router.delete('/:id', async (req, res) => {
     res.json({ deleted: true });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error al eliminar rol', glosa: err.message || err.toString() });
+    res.status(500).json({ error: 'Error al eliminar rol', glosa: "Ocurrió un error interno" });
   }
 });
 

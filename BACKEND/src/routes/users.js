@@ -19,7 +19,7 @@ router.post("/", validate(createUserSchema), async (req, res) => {
     console.error(err);
     res.status(500).json({
       error: "Error al crear usuario",
-      glosa: err.message || err.toString(),
+      glosa: "Ocurrió un error interno",
     });
   }
 });
@@ -27,7 +27,7 @@ router.post("/", validate(createUserSchema), async (req, res) => {
 router.get("/", async (req, res) => {
   try {
     const authUser = getUserFromAuthHeader(req);
-    console.log("authUser", authUser);
+
     if (!authUser || !authUser.empresaId) {
       return res.status(401).json({
         error: "No autorizado",
@@ -49,7 +49,7 @@ router.get("/", async (req, res) => {
     console.error(err);
     res.status(500).json({
       error: "Error al listar usuarios",
-      glosa: err.message || err.toString(),
+      glosa: "Ocurrió un error interno",
     });
   }
 });
@@ -103,7 +103,7 @@ router.get("/:id", async (req, res) => {
     console.error(err);
     res.status(500).json({
       error: "Error al obtener usuario",
-      glosa: err.message || err.toString(),
+      glosa: "Ocurrió un error interno",
     });
   }
 });
@@ -226,7 +226,7 @@ router.put("/:id", validate(updateUserSchema), async (req, res) => {
     console.error(err);
     res.status(500).json({
       error: "Error al actualizar usuario",
-      glosa: err.message || err.toString(),
+      glosa: "Ocurrió un error interno",
     });
   }
 });
@@ -254,7 +254,7 @@ router.delete("/:id", async (req, res) => {
     console.error(err);
     res.status(500).json({
       error: "Error al eliminar usuario",
-      glosa: err.message || err.toString(),
+      glosa: "Ocurrió un error interno",
     });
   }
 });
