@@ -11,7 +11,7 @@ export default {
         sans: ["Poppins", "Arial", "sans-serif"],
       },
       fontSize: {
-        base: "13px" /* Reducido de 14px (default) a 12px (2pt menos) */,
+        base: "16px" /* Reducido de 14px (default) a 12px (2pt menos) */,
       },
     },
   },
