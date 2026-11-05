@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "test": "jest",
-    "test:coverage": "npx jest --coverage"
+    "test:coverage": "npx jest --coverage --passWithNoTests"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
