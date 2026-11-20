@@ -52,7 +52,7 @@ jobs:
           cache-dependency-path: BACKEND/package-lock.json
 
       - name: Levantar solo PostgreSQL para pruebas de backend
-        run: docker compose up -d postgres --wait
+        run: docker compose up -d --wait atlas-postgres-et
 
       - name: Ejecutar pruebas y cobertura en Backend
         run: |
