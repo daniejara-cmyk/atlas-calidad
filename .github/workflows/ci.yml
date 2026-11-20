@@ -85,7 +85,7 @@ jobs:
         run: sed -i 's#^SF:#SF:BACKEND/#' BACKEND/coverage/lcov.info
  
       - name: Análisis SonarQube Cloud y Quality Gate
-        uses: SonarSource/sonarqube-scan-action@v5
+        uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
