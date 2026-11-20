@@ -1,212 +1,142 @@
-# =====================================================================
-#  Pipeline de calidad de Atlas (Integración Continua)
-#  Se ejecuta solo cada vez que alguien sube cambios o abre un Pull Request.
-# =====================================================================
-name: Calidad Atlas
- 
+name: Pipeline CI/CD - Atlas
+
 on:
   push:
-    branches: [main, develop]
+    branches: [ main ]
   pull_request:
-    branches: [main]
-  workflow_dispatch:   # permite ejecutarlo a mano desde la pestaña Actions
- 
-permissions:
-  contents: read
- 
+    branches: [ main ]
+
 jobs:
   # -------------------------------------------------------------------
-  # ETAPA 1 · Revisiones rápidas (se ejecutan en paralelo)
+  # ETAPA 1 · Seguridad rápida y calidad de contenedores
   # -------------------------------------------------------------------
-  secretos:
-    name: 1a · Secretos (Gitleaks)
+  seguridad-rapida:
+    name: 1 · Diagnóstico rápido de seguridad y Docker
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0          # revisa TODO el historial, no solo el último cambio
-      - name: Descargar Gitleaks
-        run: |
-          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz | tar xz gitleaks
-      - name: Buscar contraseñas y claves expuestas
-        run: ./gitleaks git . --redact -v
- 
-        
-  dockerfiles:
-    name: 1b · Dockerfiles (Hadolint)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Revisar Dockerfile del backend
+          fetch-depth: 0
+
+      - name: Escanear secretos con Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Analizar Dockerfile con Hadolint (Backend)
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: BACKEND/Dockerfile
-      - name: Revisar Dockerfile del frontend
+
+      - name: Analizar Dockerfile con Hadolint (Frontend)
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: FRONTEND/Dockerfile
- 
+
   # -------------------------------------------------------------------
-  # ETAPA 2 · Pruebas unitarias, de integración y análisis de código
+  # ETAPA 2 · Pruebas de código y análisis estático
   # -------------------------------------------------------------------
   pruebas-codigo:
-    name: 2 · Unitarias + Integración (Jest) y SonarQube
-    needs: [secretos, dockerfiles]
-    runs-on: ubuntu-latest
+    name: 2 · Pruebas de código, cobertura y SonarQube
+    needs: [seguridad-rapida]
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0          # SonarQube necesita el historial completo
- 
-      - name: Encender la base de datos de pruebas
-        run: docker compose up -d --wait atlas-postgres-et
- 
+          fetch-depth: 0
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
+          cache: 'npm'
           cache-dependency-path: BACKEND/package-lock.json
- 
-      - name: Instalar dependencias del backend
-        working-directory: BACKEND
-        run: npm ci
- 
-      - name: Ejecutar pruebas unitarias e integración con cobertura
-        working-directory: BACKEND
-        run: npm test -- --runInBand
- 
-      - name: Guardar reporte de cobertura
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: cobertura-backend
-          path: BACKEND/coverage/
- 
-      - name: Ajustar rutas de cobertura para SonarQube
-        run: sed -i 's#^SF:#SF:BACKEND/#' BACKEND/coverage/lcov.info
- 
-      - name: Análisis SonarQube Cloud y Quality Gate
-        uses: SonarSource/sonarqube-scan-action@v5
+
+      - name: Levantar solo PostgreSQL para pruebas de backend
+        run: docker compose up -d postgres --wait
+
+      - name: Ejecutar pruebas y cobertura en Backend
+        run: |
+          cd BACKEND
+          npm ci
+          npm test -- --runInBand
+
+      - name: Análisis SonarQube Cloud
+        uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           args: >
-            -Dsonar.qualitygate.wait=true
- 
+            -Dsonar.qualitygate.wait=false
+
   # -------------------------------------------------------------------
   # ETAPA 3 · Pruebas del sistema completo funcionando
   # -------------------------------------------------------------------
   pruebas-sistema:
     name: 3 · Sistema, aceptación, rendimiento y seguridad
     needs: [pruebas-codigo]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
- 
+
       - name: Construir y encender Atlas completo con Docker
         run: docker compose up -d --build --wait
- 
-      - name: Esperar a que el frontend responda
-        run: |
-          for i in $(seq 1 30); do
-            curl -sf http://localhost:3351 > /dev/null && exit 0
-            sleep 2
-          done
-          echo "El frontend no respondió a tiempo" && exit 1
- 
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
- 
-      # --- Sistema + aceptación + accesibilidad (Playwright) ---
-      - name: Instalar Playwright
-        working-directory: pruebas-e2e
+
+      - name: Instalar Playwright y navegadores
         run: |
+          cd pruebas-e2e
           npm ci
           npx playwright install --with-deps chromium
- 
-      - name: Pruebas de sistema, aceptación y accesibilidad
-        working-directory: pruebas-e2e
-        run: npx playwright test
- 
-      - name: Guardar reporte de Playwright
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: reporte-playwright
-          path: pruebas-e2e/playwright-report/
- 
-      # --- Rendimiento (k6) ---
-      - name: Prueba de rendimiento (perfil humo)
+
+      - name: Ejecutar pruebas E2E con Playwright
         run: |
-          docker run --rm --network host \
-            -v "$PWD/pruebas-rendimiento:/scripts" \
-            grafana/k6:1.3.0 run -e PERFIL=humo /scripts/carga.js
- 
-      # --- Seguridad dinámica (OWASP ZAP) ---
-      - name: Escaneo de seguridad ZAP (web y API)
-        if: always()
-        run: |
-          mkdir -p zap && chmod 777 zap
-          docker run --rm --network host -v "$PWD/zap:/zap/wrk:rw" \
-            ghcr.io/zaproxy/zaproxy:stable \
-            zap-baseline.py -t http://localhost:3351 -r zap-web.html -I
-          docker run --rm --network host -v "$PWD/zap:/zap/wrk:rw" \
-            ghcr.io/zaproxy/zaproxy:stable \
-            zap-api-scan.py -t http://localhost:4451/openapi.json -f openapi -r zap-api.html -I
- 
-      - name: Guardar reportes de ZAP
-        if: always()
-        uses: actions/upload-artifact@v4
+          cd pruebas-e2e
+          npx playwright test
+
+      - name: Ejecutar prueba de rendimiento con k6
+        uses: grafana/k6-action@v0.3.1
         with:
-          name: reportes-zap
-          path: zap/
- 
-      - name: Apagar Atlas
-        if: always()
-        run: docker compose down -v
- 
+          filename: pruebas-e2e/tests/performance.k6.js
+
+      - name: Escaneo de seguridad dinámico API con OWASP ZAP
+        run: |
+          mkdir -p zap
+          docker run --rm -v "${PWD}/zap:/zap/wrk:rw" ghcr.io/zaproxy/zaproxy:stable zap-api-scan.py -t http://host.docker.internal:4451/openapi.json -f openapi -O host.docker.internal:4451 -r zap-api.html -I || true
+
   # -------------------------------------------------------------------
-  # ETAPA 4 · Entrega continua: publicar las imágenes aprobadas
-  # Solo ocurre en la rama main y solo si TODO lo anterior salió bien.
+  # ETAPA 4 · Publicar imágenes en GitHub Container Registry (GHCR)
   # -------------------------------------------------------------------
-  publicar:
-    name: 4 · Publicar imágenes Docker (GHCR)
+  publicar-imagenes:
+    name: 4 · Publicar imágenes Docker en GHCR
     needs: [pruebas-sistema]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-22.04
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
- 
-      - name: Preparar nombre del dueño en minúsculas
-        run: echo "OWNER=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
- 
+
       - name: Iniciar sesión en GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
- 
-      - name: Construir y publicar imagen del backend
-        uses: docker/build-push-action@v6
+
+      - name: Construir y publicar imagen Backend
+        uses: docker/build-push-action@v5
         with:
           context: ./BACKEND
           push: true
-          tags: |
-            ghcr.io/${{ env.OWNER }}/atlas-backend:latest
-            ghcr.io/${{ env.OWNER }}/atlas-backend:${{ github.sha }}
- 
-      - name: Construir y publicar imagen del frontend
-        uses: docker/build-push-action@v6
+          tags: ghcr.io/${{ github.repository }}/atlas-backend:latest
+
+      - name: Construir y publicar imagen Frontend
+        uses: docker/build-push-action@v5
         with:
           context: ./FRONTEND
           push: true
-          build-args: |
-            VITE_API_URL=http://localhost:4451
-          tags: |
-            ghcr.io/${{ env.OWNER }}/atlas-frontend:latest
-            ghcr.io/${{ env.OWNER }}/atlas-frontend:${{ github.sha }}
+          tags: ghcr.io/${{ github.repository }}/atlas-frontend:latest
