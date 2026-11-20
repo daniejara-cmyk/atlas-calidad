@@ -17,8 +17,11 @@ const empresasRoutes = require("./routes/empresas");
 const rolesRoutes = require("./routes/roles");
 const empresaUsuariosRoutes = require("./routes/empresa_usuarios");
 const metricasRoutes = require("./routes/metricas");
+const helmet = require("helmet");
 
 const app = express();
+ 
+app.use(helmet());
 
 app.use(cors());
 app.use(express.json());

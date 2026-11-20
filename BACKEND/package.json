@@ -3,26 +3,32 @@
   "version": "1.0.0",
   "description": "API Atlas - Express + PostgreSQL (intencionalmente vulnerable)",
   "main": "src/app.js",
- "scripts": {
-  "start": "node src/app.js",
-  "dev": "nodemon",
-  "test": "jest --coverage",
-  "test:unit": "jest tests/unit",
-  "test:integration": "jest tests/integration --runInBand"
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon",
+    "test": "jest --coverage",
+    "test:unit": "jest tests/unit",
+    "test:integration": "jest tests/integration --runInBand"
   },
-
   "jest": {
-  "testEnvironment": "node",
-  "setupFiles": ["<rootDir>/tests/setup-env.js"],
-  "collectCoverageFrom": ["src/**/*.js"],
-  "coverageReporters": ["text-summary", "lcov"],
-  "testTimeout": 15000
+    "testEnvironment": "node",
+    "setupFiles": [
+      "<rootDir>/tests/setup-env.js"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.js"
+    ],
+    "coverageReporters": [
+      "text-summary",
+      "lcov"
+    ],
+    "testTimeout": 15000
   },
-
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
